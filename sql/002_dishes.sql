@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS dishes (
+    dish_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    dish_name VARCHAR(100) NOT NULL,
+    category VARCHAR(50),
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
