@@ -105,7 +105,33 @@ export const addOrder = async (orderData) => {
 
     await client.query("COMMIT");
 
-    return order;
+    return {
+      order_id: order.order_id,
+      order_number: order.order_number,
+
+      customer_id,
+      customer_name,
+      customer_mobile,
+
+      delivery_datetime,
+
+      delivery_charge,
+      discount,
+      other_charges,
+
+      total_amount,
+      bill_notes,
+
+      is_paid: false,
+      reminder_count: 0,
+
+      items: items.map((item, index) => ({
+        order_item_id: index,
+        ...item,
+      })),
+    };
+
+    
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
