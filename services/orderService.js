@@ -19,6 +19,16 @@ export const addOrder = async (orderData) => {
       items,
     } = orderData;
 
+    // Name & mobile are optional
+    const resolvedCustomerName =
+      typeof customer_name === "string" && customer_name.trim()
+        ? customer_name.trim()
+        : null;
+    const resolvedCustomerMobile =
+      typeof customer_mobile === "string" && customer_mobile.trim()
+        ? customer_mobile.trim()
+        : null;
+
     // Generate Order Number
     const currentYear = new Date().getFullYear();
 
@@ -63,9 +73,9 @@ export const addOrder = async (orderData) => {
 
     const orderResult = await client.query(orderQuery, [
       order_number,
-      customer_id,
-      customer_name,
-      customer_mobile,
+      customer_id || null,
+      resolvedCustomerName,
+      resolvedCustomerMobile,
       delivery_datetime,
       delivery_charge,
       discount,
@@ -109,9 +119,9 @@ export const addOrder = async (orderData) => {
       order_id: order.order_id,
       order_number: order.order_number,
 
-      customer_id,
-      customer_name,
-      customer_mobile,
+      customer_id: customer_id || null,
+      customer_name: resolvedCustomerName,
+      customer_mobile: resolvedCustomerMobile,
 
       delivery_datetime,
 
@@ -317,6 +327,15 @@ export const updateOrder = async (orderData) => {
       items,
     } = orderData;
 
+    const resolvedCustomerName =
+      typeof customer_name === "string" && customer_name.trim()
+        ? customer_name.trim()
+        : null;
+    const resolvedCustomerMobile =
+      typeof customer_mobile === "string" && customer_mobile.trim()
+        ? customer_mobile.trim()
+        : null;
+
     await client.query(
       `
       UPDATE orders
@@ -334,9 +353,9 @@ export const updateOrder = async (orderData) => {
         WHERE order_id = $10;
       `,
       [
-        customer_id,
-        customer_name,
-        customer_mobile,
+        customer_id || null,
+        resolvedCustomerName,
+        resolvedCustomerMobile,
         delivery_datetime,
         delivery_charge,
         discount,
@@ -381,8 +400,27 @@ export const updateOrder = async (orderData) => {
 
     await client.query("COMMIT");
 
+    const orderMeta = await client.query(
+      `SELECT order_number FROM orders WHERE order_id = $1`,
+      [order_id]
+    );
+
     return {
       order_id,
+      order_number: orderMeta.rows[0]?.order_number,
+
+      customer_id: customer_id || null,
+      customer_name: resolvedCustomerName,
+      customer_mobile: resolvedCustomerMobile,
+
+      delivery_datetime,
+      delivery_charge,
+      discount,
+      other_charges,
+      total_amount,
+      bill_notes,
+
+      items,
     };
   } catch (error) {
     await client.query("ROLLBACK");

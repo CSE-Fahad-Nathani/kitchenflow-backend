@@ -6,6 +6,7 @@ import customerRoutes from "./routes/customerRoutes.js";
 import dishRoutes from "./routes/dishRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import sundaySpecialRoutes from "./routes/sundaySpecialRoutes.js";
 
 
 
@@ -19,6 +20,7 @@ app.use("/api/customers", customerRoutes);
 app.use("/api/dishes", dishRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/sunday-specials", sundaySpecialRoutes);
 
 app.get("/", (req, res) => {
   res.json({

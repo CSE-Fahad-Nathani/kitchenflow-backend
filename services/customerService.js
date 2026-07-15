@@ -1,5 +1,8 @@
 import pool from "../database/db.js";
 
+const optionalText = (value) =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
 export const createCustomer = async ({ name, mobile, address, notes }) => {
   const query = `
     INSERT INTO customers (name, mobile, address, notes)
@@ -7,7 +10,12 @@ export const createCustomer = async ({ name, mobile, address, notes }) => {
     RETURNING customer_id, name, mobile, address, notes, is_deleted, created_at, updated_at;
   `;
 
-  const values = [name, mobile, address, notes];
+  const values = [
+    name,
+    optionalText(mobile),
+    optionalText(address),
+    optionalText(notes),
+  ];
 
   const result = await pool.query(query, values);
 
@@ -69,7 +77,13 @@ export const getCustomers = async () => {
       RETURNING *;
     `;
   
-    const values = [name, mobile, address, notes, customer_id];
+    const values = [
+      name,
+      optionalText(mobile),
+      optionalText(address),
+      optionalText(notes),
+      customer_id,
+    ];
   
     const result = await pool.query(query, values);
   
