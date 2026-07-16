@@ -7,6 +7,8 @@ import dishRoutes from "./routes/dishRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import sundaySpecialRoutes from "./routes/sundaySpecialRoutes.js";
+import monthlyTiffinRoutes from "./routes/monthlyTiffinRoutes.js";
+import datewiseBillRoutes from "./routes/datewiseBillRoutes.js";
 
 
 
@@ -21,6 +23,8 @@ app.use("/api/dishes", dishRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/sunday-specials", sundaySpecialRoutes);
+app.use("/api/monthly-tiffin", monthlyTiffinRoutes);
+app.use("/api/datewise-bills", datewiseBillRoutes);
 
 app.get("/", (req, res) => {
   res.json({
