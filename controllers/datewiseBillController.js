@@ -3,6 +3,8 @@ import {
     getDatewiseBills,
     getDatewiseBillById,
     deleteDatewiseBill,
+    markDatewiseBillPaid,
+    increaseDatewiseBillReminder,
   } from "../services/datewiseBillService.js";
 
 
@@ -115,4 +117,59 @@ import {
   };
 
 
+  export const updateDatewiseBillPaymentStatus = async (req, res) => {
+    try {
+      const { bill_id } = req.body;
+
+      if (!bill_id) {
+        return res.status(400).json({
+          success: false,
+          message: "bill_id is required",
+        });
+      }
+
+      const bill = await markDatewiseBillPaid(bill_id);
+
+      res.json({
+        success: true,
+        message: "Bill marked as paid.",
+        data: bill,
+      });
+    } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  };
+
+  export const updateDatewiseBillReminderCount = async (req, res) => {
+    try {
+      const { bill_id } = req.body;
+
+      if (!bill_id) {
+        return res.status(400).json({
+          success: false,
+          message: "bill_id is required",
+        });
+      }
+
+      const bill = await increaseDatewiseBillReminder(bill_id);
+
+      res.json({
+        success: true,
+        message: "Reminder count updated.",
+        data: bill,
+      });
+    } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  };
 

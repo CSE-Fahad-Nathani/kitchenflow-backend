@@ -103,6 +103,8 @@ export const createDatewiseBill = async (billData) => {
         customer_mobile,
         discount,
         total_amount,
+        is_paid,
+        reminder_count,
         created_at
       FROM datewise_bills
       WHERE
@@ -130,6 +132,9 @@ export const createDatewiseBill = async (billData) => {
         b.customer_mobile,
         b.discount,
         b.total_amount,
+        b.is_paid,
+        b.reminder_count,
+        b.last_reminder_at,
         COALESCE(
           json_agg(
             json_build_object(
@@ -195,7 +200,45 @@ export const createDatewiseBill = async (billData) => {
   };
 
 
+  export const markDatewiseBillPaid = async (bill_id) => {
+    const query = `
+      UPDATE datewise_bills
+      SET
+        is_paid = TRUE,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE
+        bill_id = $1
+        AND is_deleted = FALSE
+      RETURNING
+        bill_id,
+        is_paid;
+    `;
 
+    const result = await pool.query(query, [bill_id]);
+
+    return result.rows[0];
+  };
+
+  export const increaseDatewiseBillReminder = async (bill_id) => {
+    const query = `
+      UPDATE datewise_bills
+      SET
+        reminder_count = reminder_count + 1,
+        last_reminder_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE
+        bill_id = $1
+        AND is_deleted = FALSE
+      RETURNING
+        bill_id,
+        reminder_count,
+        last_reminder_at;
+    `;
+
+    const result = await pool.query(query, [bill_id]);
+
+    return result.rows[0];
+  };
 
 
 

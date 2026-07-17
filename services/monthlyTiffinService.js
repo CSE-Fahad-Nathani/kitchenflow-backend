@@ -18,17 +18,18 @@ export const createMonthlyTiffinBill = async (billData) => {
   
         dish_name,
         variant_name,
-  
+
+        quantity,
         rate_per_day,
-  
+
         delivery_charge,
         discount,
-  
+
         total_amount,
-  
+
         excluded_dates,
       } = billData;
-  
+
       const billResult = await client.query(
         `
         INSERT INTO monthly_tiffin_bills (
@@ -39,12 +40,13 @@ export const createMonthlyTiffinBill = async (billData) => {
           to_date,
           dish_name,
           variant_name,
+          quantity,
           rate_per_day,
           delivery_charge,
           discount,
           total_amount
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
         RETURNING bill_id;
         `,
         [
@@ -55,6 +57,7 @@ export const createMonthlyTiffinBill = async (billData) => {
           to_date,
           dish_name,
           variant_name,
+          quantity ?? 1,
           rate_per_day,
           delivery_charge,
           discount,
@@ -106,10 +109,13 @@ export const createMonthlyTiffinBill = async (billData) => {
         to_date,
         dish_name,
         variant_name,
+        quantity,
         rate_per_day,
         delivery_charge,
         discount,
-        total_amount
+        total_amount,
+        is_paid,
+        reminder_count
       FROM monthly_tiffin_bills
       WHERE
         is_deleted = FALSE
@@ -139,10 +145,14 @@ export const createMonthlyTiffinBill = async (billData) => {
         b.to_date,
         b.dish_name,
         b.variant_name,
+        b.quantity,
         b.rate_per_day,
         b.delivery_charge,
         b.discount,
         b.total_amount,
+        b.is_paid,
+        b.reminder_count,
+        b.last_reminder_at,
         COALESCE(
           json_agg(
             json_build_object(
@@ -189,7 +199,44 @@ export const createMonthlyTiffinBill = async (billData) => {
   };
 
 
-  
+  export const markMonthlyTiffinBillPaid = async (bill_id) => {
+    const query = `
+      UPDATE monthly_tiffin_bills
+      SET
+        is_paid = TRUE,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE
+        bill_id = $1
+        AND is_deleted = FALSE
+      RETURNING
+        bill_id,
+        is_paid;
+    `;
 
+    const result = await pool.query(query, [bill_id]);
+
+    return result.rows[0];
+  };
+
+  export const increaseMonthlyTiffinReminder = async (bill_id) => {
+    const query = `
+      UPDATE monthly_tiffin_bills
+      SET
+        reminder_count = reminder_count + 1,
+        last_reminder_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE
+        bill_id = $1
+        AND is_deleted = FALSE
+      RETURNING
+        bill_id,
+        reminder_count,
+        last_reminder_at;
+    `;
+
+    const result = await pool.query(query, [bill_id]);
+
+    return result.rows[0];
+  };
 
 
