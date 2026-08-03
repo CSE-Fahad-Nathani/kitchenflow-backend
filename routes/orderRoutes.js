@@ -3,6 +3,7 @@ import {
   createOrder,
   fetchOrders,
   fetchTodaysOrders,
+  fetchOrderById,
   updateOrderPaymentStatus,
   editOrder,
   removeOrder,
@@ -16,6 +17,8 @@ router.post("/add-order", createOrder);
 router.get("/fetch-orders", fetchOrders);
 
 router.get("/fetch-todays-orders", fetchTodaysOrders);
+
+router.get("/:order_id", fetchOrderById);
 
 router.patch("/mark-paid", updateOrderPaymentStatus);
 

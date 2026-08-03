@@ -1,5 +1,5 @@
 /**
- * Dashboard revenue helpers — combine Standard Orders, Monthly Tiffin, Date-wise Bills.
+ * Dashboard revenue helpers — combine Standard, Monthly Tiffin, Date-wise, Calendar Bills.
  * All daily amounts are attributed to the calendar day/month the service belongs to.
  */
 
@@ -217,12 +217,35 @@ export const applyMonthlyTiffinToDaily = (bills, map, startDate, nextMonth) => {
     const billableDays = billableDaysList.length;
     if (billableDays === 0) continue;
 
-    const rate = Number(bill.rate_per_day) || 0;
-    const qty = Math.max(1, Number(bill.quantity) || 1);
-    const deliveryPerDay = Number(bill.delivery_charge) || 0;
+    const dishes =
+      Array.isArray(bill.dishes) && bill.dishes.length > 0
+        ? bill.dishes
+        : [
+            {
+              rate_per_day: bill.rate_per_day,
+              quantity: bill.quantity,
+              delivery_charge_per_day: bill.delivery_charge,
+            },
+          ];
+
+    const dayBase = dishes.reduce((sum, dish) => {
+      const rate = Number(dish.rate_per_day) || 0;
+      const qty = Math.max(1, Number(dish.quantity) || 1);
+      const deliveryPerDay =
+        Number(dish.delivery_charge_per_day ?? dish.delivery_charge) || 0;
+      return sum + rate * qty + deliveryPerDay;
+    }, 0);
+
+    const deliveryPerDay = dishes.reduce((sum, dish) => {
+      return (
+        sum +
+        (Number(dish.delivery_charge_per_day ?? dish.delivery_charge) || 0)
+      );
+    }, 0);
+
     const discount = Number(bill.discount) || 0;
     const discountPerDay = discount / billableDays;
-    const dailyRevenue = rate * qty + deliveryPerDay - discountPerDay;
+    const dailyRevenue = dayBase - discountPerDay;
 
     const daysInMonth = billableDaysList.filter((d) =>
       inRange(d, startDate, nextMonth)
@@ -287,6 +310,47 @@ export const applyDatewiseToDaily = (bills, map, startDate, nextMonth) => {
         delivery: Number(day.delivery_charge) || 0,
       });
     });
+
+    if (hasDayInMonth) {
+      billAmounts.push(Number(bill.total_amount) || 0);
+    }
+  }
+
+  return billAmounts;
+};
+
+/**
+ * Calendar Bill: each selected dish date gets ((rate × qty) + delivery).
+ * Overlapping dates across dishes each contribute their own dish day amount.
+ */
+export const applyCalendarBillToDaily = (bills, map, startDate, nextMonth) => {
+  const billAmounts = [];
+
+  for (const bill of bills) {
+    const dishes = bill.dishes || [];
+    if (dishes.length === 0) continue;
+
+    let hasDayInMonth = false;
+
+    for (const dish of dishes) {
+      const rate = Number(dish.rate_per_day) || 0;
+      const qty = Number(dish.quantity) || 1;
+      const delivery = Number(dish.delivery_charge_per_day) || 0;
+      const dayAmount = rate * qty + delivery;
+
+      for (const rawDate of dish.dates || []) {
+        const date = String(rawDate).slice(0, 10);
+        if (!inRange(date, startDate, nextMonth)) continue;
+
+        hasDayInMonth = true;
+        addDailyEntry(map, date, {
+          orders: 1,
+          revenue: dayAmount,
+          discount: 0,
+          delivery,
+        });
+      }
+    }
 
     if (hasDayInMonth) {
       billAmounts.push(Number(bill.total_amount) || 0);
@@ -374,6 +438,20 @@ export const countDatewiseBillsInMonth = (bills, startDate, nextMonth) => {
   return count;
 };
 
+/** Count calendar bills with at least one selected date in the month. */
+export const countCalendarBillsInMonth = (bills, startDate, nextMonth) => {
+  let count = 0;
+  for (const bill of bills) {
+    const has = (bill.dishes || []).some((dish) =>
+      (dish.dates || []).some((date) =>
+        inRange(String(date).slice(0, 10), startDate, nextMonth)
+      )
+    );
+    if (has) count += 1;
+  }
+  return count;
+};
+
 export const countStandardOrdersInMonth = (orders, startDate, nextMonth) => {
   return orders.filter((o) => {
     const raw = o.delivery_datetime;
@@ -426,11 +504,20 @@ export const summarizeDatewiseForMonth = (bills, startDate, nextMonth) => {
   return formatModuleStats(totalBills, sumMapRevenue(map));
 };
 
+/** Calendar bill block — revenue only for selected dates in the month. */
+export const summarizeCalendarForMonth = (bills, startDate, nextMonth) => {
+  const map = createDailyMap();
+  applyCalendarBillToDaily(bills, map, startDate, nextMonth);
+  const totalBills = countCalendarBillsInMonth(bills, startDate, nextMonth);
+  return formatModuleStats(totalBills, sumMapRevenue(map));
+};
+
 /** Build all merged revenue metrics for one calendar month. */
 export const buildRevenueMetrics = ({
   orders = [],
   tiffinBills = [],
   datewiseBills = [],
+  calendarBills = [],
   startDate,
   nextMonth,
   month,
@@ -440,12 +527,14 @@ export const buildRevenueMetrics = ({
     ...applyStandardOrdersToDaily(orders, map, startDate, nextMonth),
     ...applyMonthlyTiffinToDaily(tiffinBills, map, startDate, nextMonth),
     ...applyDatewiseToDaily(datewiseBills, map, startDate, nextMonth),
+    ...applyCalendarBillToDaily(calendarBills, map, startDate, nextMonth),
   ];
 
   const totalOrders =
     countStandardOrdersInMonth(orders, startDate, nextMonth) +
     countTiffinBillsInMonth(tiffinBills, startDate, nextMonth) +
-    countDatewiseBillsInMonth(datewiseBills, startDate, nextMonth);
+    countDatewiseBillsInMonth(datewiseBills, startDate, nextMonth) +
+    countCalendarBillsInMonth(calendarBills, startDate, nextMonth);
 
   const standardBreakdown = summarizeStandardForMonth(
     orders,
@@ -462,6 +551,11 @@ export const buildRevenueMetrics = ({
     startDate,
     nextMonth
   );
+  const calendarBreakdown = summarizeCalendarForMonth(
+    calendarBills,
+    startDate,
+    nextMonth
+  );
 
   return {
     revenue: {
@@ -475,6 +569,10 @@ export const buildRevenueMetrics = ({
         datewise_bills: formatBreakdownItem(
           datewiseBreakdown.total_bills,
           datewiseBreakdown.total_revenue
+        ),
+        calendar_bills: formatBreakdownItem(
+          calendarBreakdown.total_bills,
+          calendarBreakdown.total_revenue
         ),
       },
     },

@@ -9,6 +9,8 @@ import dashboardRoutes from "./routes/dashboardRoutes.js";
 import sundaySpecialRoutes from "./routes/sundaySpecialRoutes.js";
 import monthlyTiffinRoutes from "./routes/monthlyTiffinRoutes.js";
 import datewiseBillRoutes from "./routes/datewiseBillRoutes.js";
+import calendarBillRoutes from "./routes/calendarBillRoutes.js";
+import customerCreditRoutes from "./routes/customerCreditRoutes.js";
 
 
 
@@ -25,6 +27,8 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/sunday-specials", sundaySpecialRoutes);
 app.use("/api/monthly-tiffin", monthlyTiffinRoutes);
 app.use("/api/datewise-bills", datewiseBillRoutes);
+app.use("/api/calendar-bills", calendarBillRoutes);
+app.use("/api/customer-credits", customerCreditRoutes);
 
 app.get("/", (req, res) => {
   res.json({

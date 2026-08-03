@@ -13,25 +13,33 @@ import {
         from_date,
         to_date,
         customer_name,
-        dish_name,
-        rate_per_day,
+        dishes,
       } = req.body;
-  
+
       if (
         !from_date ||
         !to_date ||
         !customer_name ||
-        !dish_name ||
-        !rate_per_day
+        !Array.isArray(dishes) ||
+        dishes.length === 0
       ) {
         return res.status(400).json({
           success: false,
           message: "Missing required fields",
         });
       }
-  
+
+      for (const dish of dishes) {
+        if (!dish?.dish_name?.trim() || dish.rate_per_day == null) {
+          return res.status(400).json({
+            success: false,
+            message: "Each dish needs a name and rate/day",
+          });
+        }
+      }
+
       const bill = await createMonthlyTiffinBill(req.body);
-  
+
       res.status(201).json({
         success: true,
         message: "Monthly Tiffin Bill created successfully.",
@@ -39,7 +47,7 @@ import {
       });
     } catch (error) {
       console.error(error);
-  
+
       res.status(500).json({
         success: false,
         message: error.message,

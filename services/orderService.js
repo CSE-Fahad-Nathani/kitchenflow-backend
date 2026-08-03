@@ -245,6 +245,51 @@ export const getTodaysOrders = async () => {
   return result.rows;
 };
 
+export const getOrderById = async (order_id) => {
+  const query = `
+    SELECT
+      o.order_id,
+      o.order_number,
+      o.customer_id,
+      o.customer_name,
+      o.customer_mobile,
+      o.delivery_datetime,
+      o.delivery_charge,
+      o.discount,
+      o.other_charges,
+      o.total_amount,
+      o.bill_notes,
+      o.is_paid,
+      o.reminder_count,
+      o.order_date,
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'order_item_id', oi.order_item_id,
+            'dish_id', oi.dish_id,
+            'variant_id', oi.variant_id,
+            'dish_name', oi.dish_name,
+            'variant_name', oi.variant_name,
+            'quantity', oi.quantity,
+            'unit_price', oi.unit_price,
+            'total_price', oi.total_price
+          )
+          ORDER BY oi.created_at
+        ) FILTER (WHERE oi.order_item_id IS NOT NULL),
+        '[]'
+      ) AS items
+    FROM orders o
+    LEFT JOIN order_items oi
+      ON o.order_id = oi.order_id
+    WHERE
+      o.is_deleted = FALSE
+      AND o.order_id = $1
+    GROUP BY o.order_id;
+  `;
+
+  const result = await pool.query(query, [order_id]);
+  return result.rows[0] || null;
+};
 
 export const markOrderPaid = async (order_id) => {
   const query = `

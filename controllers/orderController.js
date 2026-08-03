@@ -2,6 +2,7 @@ import {
   addOrder,
   getOrders,
   getTodaysOrders,
+  getOrderById,
   markOrderPaid,
   deleteOrder,
   updateOrder,
@@ -76,6 +77,28 @@ export const fetchOrders = async (req, res) => {
     } catch (error) {
       console.error(error);
   
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  };
+
+  export const fetchOrderById = async (req, res) => {
+    try {
+      const order = await getOrderById(req.params.order_id);
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: "Order not found",
+        });
+      }
+      res.json({
+        success: true,
+        data: order,
+      });
+    } catch (error) {
+      console.error(error);
       res.status(500).json({
         success: false,
         message: error.message,

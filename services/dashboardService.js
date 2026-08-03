@@ -5,6 +5,7 @@ import {
   calculateGrowth,
   summarizeTiffinForMonth,
   summarizeDatewiseForMonth,
+  summarizeCalendarForMonth,
 } from "./dashboardRevenueHelpers.js";
 
 const fetchRevenueSourceData = async (rangeStart, rangeEnd) => {
@@ -31,6 +32,30 @@ const fetchRevenueSourceData = async (rangeStart, rangeEnd) => {
       b.delivery_charge,
       b.discount,
       b.total_amount,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'rate_per_day', d.rate_per_day,
+              'quantity', d.quantity,
+              'delivery_charge_per_day', d.delivery_charge_per_day
+            )
+          )
+          FROM monthly_tiffin_bill_dishes d
+          WHERE d.bill_id = b.bill_id
+        ),
+        CASE
+          WHEN b.rate_per_day IS NOT NULL THEN
+            json_build_array(
+              json_build_object(
+                'rate_per_day', b.rate_per_day,
+                'quantity', b.quantity,
+                'delivery_charge_per_day', b.delivery_charge
+              )
+            )
+          ELSE '[]'::json
+        END
+      ) AS dishes,
       COALESCE(
         (
           SELECT json_agg(e.excluded_date)
@@ -92,16 +117,61 @@ const fetchRevenueSourceData = async (rangeStart, rangeEnd) => {
       );
   `;
 
-  const [ordersResult, tiffinResult, datewiseResult] = await Promise.all([
-    pool.query(ordersQuery, [rangeStart, rangeEnd]),
-    pool.query(tiffinQuery, [rangeStart, rangeEnd]),
-    pool.query(datewiseQuery, [rangeStart, rangeEnd]),
-  ]);
+  const calendarQuery = `
+    SELECT
+      b.bill_id,
+      b.total_amount,
+      COALESCE(
+        (
+          SELECT json_agg(dish_data)
+          FROM (
+            SELECT json_build_object(
+              'dish_entry_id', d.dish_entry_id,
+              'rate_per_day', d.rate_per_day,
+              'quantity', d.quantity,
+              'delivery_charge_per_day', d.delivery_charge_per_day,
+              'dates', (
+                SELECT COALESCE(
+                  json_agg(dd.service_date ORDER BY dd.service_date),
+                  '[]'
+                )
+                FROM calendar_bill_dish_dates dd
+                WHERE dd.dish_entry_id = d.dish_entry_id
+              )
+            ) AS dish_data
+            FROM calendar_bill_dishes d
+            WHERE d.bill_id = b.bill_id
+          ) sub
+        ),
+        '[]'
+      ) AS dishes
+    FROM calendar_bills b
+    WHERE
+      b.is_deleted = FALSE
+      AND EXISTS (
+        SELECT 1
+        FROM calendar_bill_dishes d
+        JOIN calendar_bill_dish_dates dd ON dd.dish_entry_id = d.dish_entry_id
+        WHERE
+          d.bill_id = b.bill_id
+          AND dd.service_date >= $1::date
+          AND dd.service_date < $2::date
+      );
+  `;
+
+  const [ordersResult, tiffinResult, datewiseResult, calendarResult] =
+    await Promise.all([
+      pool.query(ordersQuery, [rangeStart, rangeEnd]),
+      pool.query(tiffinQuery, [rangeStart, rangeEnd]),
+      pool.query(datewiseQuery, [rangeStart, rangeEnd]),
+      pool.query(calendarQuery, [rangeStart, rangeEnd]),
+    ]);
 
   return {
     orders: ordersResult.rows,
     tiffinBills: tiffinResult.rows,
     datewiseBills: datewiseResult.rows,
+    calendarBills: calendarResult.rows,
   };
 };
 
@@ -143,9 +213,31 @@ export const getDashboardStatistics = async () => {
     FROM orders;
   `;
 
-  const result = await pool.query(query);
+  const creditStatsQuery = `
+    SELECT
+      COALESCE(SUM(amount), 0) AS open_credit_total,
+      COUNT(
+        DISTINCT CASE
+          WHEN customer_id IS NOT NULL THEN customer_id::text
+          ELSE lower(trim(customer_name)) || '|' || coalesce(trim(customer_mobile), '')
+        END
+      )::int AS open_credit_people,
+      COALESCE(
+        SUM(amount) FILTER (WHERE DATE(created_at) = CURRENT_DATE),
+        0
+      ) AS today_extras_total
+    FROM customer_credits;
+  `;
 
-  return result.rows[0];
+  const [result, creditResult] = await Promise.all([
+    pool.query(query),
+    pool.query(creditStatsQuery),
+  ]);
+
+  return {
+    ...result.rows[0],
+    ...creditResult.rows[0],
+  };
 };
 
 export const getMonthlyStatistics = async (month, year) => {
@@ -196,7 +288,16 @@ SELECT
         is_deleted = FALSE
         AND created_at >= $1
         AND created_at < $2
-) AS datewise_orders;
+) AS datewise_orders,
+
+(
+    SELECT COUNT(*)
+    FROM calendar_bills
+    WHERE
+        is_deleted = FALSE
+        AND created_at >= $1
+        AND created_at < $2
+) AS calendar_orders;
 `;
 
 const orderSummaryResult = await pool.query(orderSummaryQuery, [
@@ -313,6 +414,12 @@ statistics.top_dishes = topDishesResult.rows;
 
   statistics.datewise_bills = summarizeDatewiseForMonth(
     sourceData.datewiseBills,
+    startDate,
+    nextMonth
+  );
+
+  statistics.calendar_bills = summarizeCalendarForMonth(
+    sourceData.calendarBills,
     startDate,
     nextMonth
   );
