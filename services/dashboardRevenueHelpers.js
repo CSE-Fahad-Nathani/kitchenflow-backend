@@ -321,6 +321,7 @@ export const applyDatewiseToDaily = (bills, map, startDate, nextMonth) => {
 
 /**
  * Calendar Bill: each selected dish date gets ((rate × qty) + delivery).
+ * Bill discount is spread evenly across all dish-days on the bill.
  * Overlapping dates across dishes each contribute their own dish day amount.
  */
 export const applyCalendarBillToDaily = (bills, map, startDate, nextMonth) => {
@@ -330,6 +331,15 @@ export const applyCalendarBillToDaily = (bills, map, startDate, nextMonth) => {
     const dishes = bill.dishes || [];
     if (dishes.length === 0) continue;
 
+    let totalDishDays = 0;
+    for (const dish of dishes) {
+      totalDishDays += (dish.dates || []).length;
+    }
+
+    const billDiscount = Number(bill.discount) || 0;
+    const discountPerDay =
+      totalDishDays > 0 ? billDiscount / totalDishDays : 0;
+
     let hasDayInMonth = false;
 
     for (const dish of dishes) {
@@ -337,6 +347,7 @@ export const applyCalendarBillToDaily = (bills, map, startDate, nextMonth) => {
       const qty = Number(dish.quantity) || 1;
       const delivery = Number(dish.delivery_charge_per_day) || 0;
       const dayAmount = rate * qty + delivery;
+      const dailyRevenue = dayAmount - discountPerDay;
 
       for (const rawDate of dish.dates || []) {
         const date = String(rawDate).slice(0, 10);
@@ -345,8 +356,8 @@ export const applyCalendarBillToDaily = (bills, map, startDate, nextMonth) => {
         hasDayInMonth = true;
         addDailyEntry(map, date, {
           orders: 1,
-          revenue: dayAmount,
-          discount: 0,
+          revenue: dailyRevenue,
+          discount: discountPerDay,
           delivery,
         });
       }

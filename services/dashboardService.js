@@ -120,6 +120,7 @@ const fetchRevenueSourceData = async (rangeStart, rangeEnd) => {
   const calendarQuery = `
     SELECT
       b.bill_id,
+      b.discount,
       b.total_amount,
       COALESCE(
         (

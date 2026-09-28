@@ -11,6 +11,7 @@ export const createCalendarBill = async (billData) => {
       customer_name,
       customer_mobile,
       show_dates,
+      discount,
       total_amount,
       dishes,
     } = billData;
@@ -22,9 +23,10 @@ export const createCalendarBill = async (billData) => {
         customer_name,
         customer_mobile,
         show_dates,
+        discount,
         total_amount
       )
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING bill_id;
       `,
       [
@@ -32,6 +34,7 @@ export const createCalendarBill = async (billData) => {
         customer_name,
         customer_mobile || "",
         Boolean(show_dates),
+        Number(discount) || 0,
         total_amount,
       ]
     );
@@ -92,6 +95,7 @@ export const getCalendarBills = async (search = "") => {
       b.customer_name,
       b.customer_mobile,
       b.show_dates,
+      b.discount,
       b.total_amount,
       b.is_paid,
       b.reminder_count,
@@ -130,6 +134,7 @@ export const getCalendarBillById = async (bill_id) => {
       b.customer_name,
       b.customer_mobile,
       b.show_dates,
+      b.discount,
       b.total_amount,
       b.is_paid,
       b.reminder_count,
